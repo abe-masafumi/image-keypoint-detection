@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 class AppConfig:
     log_path: str
     image_path: str
+    output_image_path: str
+    orb_nfeatures: int
+    orb_scale_factor: float
+    orb_nlevels: int
+    orb_fast_threshold: int
+    orb_edge_threshold: int
     s3_bucket: str
     db_host: str
     db_port: int
@@ -25,6 +31,15 @@ class AppConfig:
         return cls(
             log_path=os.getenv("LOG_PATH", "logs/app.log"),
             image_path=os.getenv("IMAGE_PATH", ""),
+            output_image_path=os.getenv(
+                "OUTPUT_IMAGE_PATH",
+                "output_images/sample_keypoints.jpg",
+            ),
+            orb_nfeatures=int(os.getenv("ORB_NFEATURES", "500")),
+            orb_scale_factor=float(os.getenv("ORB_SCALE_FACTOR", "1.2")),
+            orb_nlevels=int(os.getenv("ORB_NLEVELS", "8")),
+            orb_fast_threshold=int(os.getenv("ORB_FAST_THRESHOLD", "20")),
+            orb_edge_threshold=int(os.getenv("ORB_EDGE_THRESHOLD", "31")),
             s3_bucket=os.getenv("S3_BUCKET", "noseid-prod"),
             db_host=os.getenv("DB_HOST", ""),
             db_port=int(os.getenv("DB_PORT", "5432")),
