@@ -12,6 +12,10 @@ class AppConfig:
     log_path: str
     image_path: str
     output_image_path: str
+    orb_mask_mode: str
+    orb_mask_center_x_ratio: float
+    orb_mask_center_y_ratio: float
+    orb_mask_radius_ratio: float
     orb_nfeatures: int
     orb_scale_factor: float
     orb_nlevels: int
@@ -34,6 +38,16 @@ class AppConfig:
             output_image_path=os.getenv(
                 "OUTPUT_IMAGE_PATH",
                 "output_images/sample_keypoints.jpg",
+            ),
+            orb_mask_mode=os.getenv("ORB_MASK_MODE", "none"),
+            orb_mask_center_x_ratio=float(
+                os.getenv("ORB_MASK_CENTER_X_RATIO", "0.5")
+            ),
+            orb_mask_center_y_ratio=float(
+                os.getenv("ORB_MASK_CENTER_Y_RATIO", "0.5")
+            ),
+            orb_mask_radius_ratio=float(
+                os.getenv("ORB_MASK_RADIUS_RATIO", "0.35")
             ),
             orb_nfeatures=int(os.getenv("ORB_NFEATURES", "500")),
             orb_scale_factor=float(os.getenv("ORB_SCALE_FACTOR", "1.2")),

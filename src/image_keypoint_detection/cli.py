@@ -23,6 +23,10 @@ def main() -> int:
     print("ORB keypoint detection")
     print(f"INPUT_PATH={config.image_path}")
     print(f"IMAGE_COUNT={len(image_paths)}")
+    print(f"ORB_MASK_MODE={config.orb_mask_mode}")
+    print(f"ORB_MASK_CENTER_X_RATIO={config.orb_mask_center_x_ratio}")
+    print(f"ORB_MASK_CENTER_Y_RATIO={config.orb_mask_center_y_ratio}")
+    print(f"ORB_MASK_RADIUS_RATIO={config.orb_mask_radius_ratio}")
     print(f"ORB_NFEATURES={config.orb_nfeatures}")
     print(f"ORB_SCALE_FACTOR={config.orb_scale_factor}")
     print(f"ORB_NLEVELS={config.orb_nlevels}")
@@ -40,6 +44,10 @@ def main() -> int:
             result = detect_orb_keypoints(
                 str(image_path),
                 output_image_path=str(output_image_path),
+                mask_mode=config.orb_mask_mode,
+                mask_center_x_ratio=config.orb_mask_center_x_ratio,
+                mask_center_y_ratio=config.orb_mask_center_y_ratio,
+                mask_radius_ratio=config.orb_mask_radius_ratio,
                 nfeatures=config.orb_nfeatures,
                 scale_factor=config.orb_scale_factor,
                 nlevels=config.orb_nlevels,
@@ -54,6 +62,7 @@ def main() -> int:
         print(f"IMAGE_PATH={result.image_path}")
         print(f"OUTPUT_IMAGE_PATH={result.output_image_path}")
         print(f"IMAGE_SIZE={result.width}x{result.height}")
+        print(f"MASK_MODE={result.mask_mode}")
         print(f"KEYPOINT_COUNT={result.keypoint_count}")
 
     print(f"TOTAL_KEYPOINT_COUNT={total_keypoints}")
