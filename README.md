@@ -23,6 +23,8 @@ pip install -r requirements.txt
 
 `MASK_MODE=circle` にすると円形マスク、`MASK_MODE=ellipse` にすると横長や縦長を指定できる楕円マスクで keypoint を検出する。楕円では `MASK_RADIUS_X_RATIO` と `MASK_RADIUS_Y_RATIO` を使う。出力画像には検出対象の輪郭を黄色で描画し、その内部の keypoint を赤いドットで重ねる。マスクを使わない場合は `MASK_MODE=none` を指定する。
 
+`LOG_PATH` に指定したディレクトリ配下へ、`YYYY-MM-DD.log` 形式の日付別ログファイルを作成する。ログ内容は JSON Lines 形式で、先頭に 1 回だけ実行共通情報を `run_start` として出し、その後に画像ごとの `image_result`、最後に `run_summary` を出力する。
+
 ORB の主な設定:
 - `ORB_NFEATURES`
 - `ORB_SCALE_FACTOR`
