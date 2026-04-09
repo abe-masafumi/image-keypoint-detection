@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import cv2
+
 from image_keypoint_detection.common import (
     FeatureDetectionResult,
     build_mask,
@@ -11,7 +12,7 @@ from image_keypoint_detection.common import (
 )
 
 
-def detect_orb_keypoints(
+def detect_sift_keypoints(
     image_path: str,
     *,
     output_image_path: str,
@@ -20,10 +21,9 @@ def detect_orb_keypoints(
     mask_center_y_ratio: float,
     mask_radius_ratio: float,
     nfeatures: int,
-    scale_factor: float,
-    nlevels: int,
-    fast_threshold: int,
-    edge_threshold: int,
+    contrast_threshold: float,
+    edge_threshold: float,
+    sigma: float,
 ) -> FeatureDetectionResult:
     path = Path(image_path)
     if not path.is_file():
@@ -41,14 +41,13 @@ def detect_orb_keypoints(
         mask_center_y_ratio=mask_center_y_ratio,
         mask_radius_ratio=mask_radius_ratio,
     )
-    orb = cv2.ORB_create(
+    sift = cv2.SIFT_create(
         nfeatures=nfeatures,
-        scaleFactor=scale_factor,
-        nlevels=nlevels,
+        contrastThreshold=contrast_threshold,
         edgeThreshold=edge_threshold,
-        fastThreshold=fast_threshold,
+        sigma=sigma,
     )
-    keypoints, _ = orb.detectAndCompute(gray_image, mask)
+    keypoints, _ = sift.detectAndCompute(gray_image, mask)
     output_path = Path(output_image_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -83,5 +82,5 @@ def detect_orb_keypoints(
         width=width,
         height=height,
         mask_mode=mask_mode,
-        detector_type="orb",
+        detector_type="sift",
     )
