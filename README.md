@@ -12,12 +12,46 @@ pip install -r requirements.txt
 ```
 
 3. 環境変数を設定する
-   `.env.example` を参考に `.env` を作成し、`LOG_PATH`、`IMAGE_PATH`、`OUTPUT_IMAGE_PATH`、`DETECTOR_TYPE`、`MASK_MODE`、`MASK_CENTER_X_RATIO`、`MASK_CENTER_Y_RATIO`、`MASK_RADIUS_RATIO`、`MASK_RADIUS_X_RATIO`、`MASK_RADIUS_Y_RATIO`、ORB / SIFT の各パラメータ、`S3_BUCKET`、DB 接続情報を設定する
+   `.env.example` を参考に `.env` を作成し、`APP_MODE`、`LOG_PATH`、`IMAGE_PATH`、`OUTPUT_IMAGE_PATH`、`DETECTOR_TYPE`、`MASK_MODE`、`MASK_CENTER_X_RATIO`、`MASK_CENTER_Y_RATIO`、`MASK_RADIUS_RATIO`、`MASK_RADIUS_X_RATIO`、`MASK_RADIUS_Y_RATIO`、ORB / SIFT の各パラメータ、`S3_BUCKET`、DB 接続情報を設定する
 
 ## Run
 `PYTHONPATH=src python main.py`
 
 `IMAGE_PATH` には画像ファイルかディレクトリを指定できる。`sample_images` のようなディレクトリを指定すると、その配下の画像をすべて処理し、`OUTPUT_IMAGE_PATH` に指定したディレクトリへ `{元ファイル名}_keypoints.jpg` の形式で出力する。
+
+`APP_MODE=db_fetch_latest` にすると、PostgreSQL に接続して `DB_SOURCE_TABLE` から最新データを取得する。`DB_FETCH_LIMIT` を指定した場合はその件数だけ取得し、未指定の場合は全件取得する。この仮実装は読み取り専用で、更新処理と削除処理は含まない。
+
+`APP_MODE=image_keypoint` で画像から keypoint を取得する。`APP_MODE=db_fetch_latest` で DB から最新データを取得する。実行コマンドは同じで、`.env` の `APP_MODE` だけを切り替える。
+
+## Cloud SQL Auth Proxy
+Cloud SQL へ `APP_MODE=db_fetch_latest` で接続する場合は、先に `cloud-sql-proxy` を起動する必要がある。
+
+```bash
+cloud-sql-proxy --debug-logs --address 127.0.0.1 --port 15432 noseid-d8f00:asia-northeast1:paws-api
+```
+
+この場合の `.env` 例:
+
+```env
+APP_MODE=db_fetch_latest
+DB_CONNECTION_TYPE=cloud_sql_auth_proxy
+DB_HOST=127.0.0.1
+DB_PORT=15432
+DB_NAME=paws-api
+DB_USER=postgres
+DB_PASSWORD=...
+DB_SCHEMA=public
+DB_SOURCE_TABLE=nose_images
+DB_UPDATE_TABLE=nose_images
+DB_FETCH_LIMIT=
+DB_INSTANCE_CONNECTION_NAME=noseid-d8f00:asia-northeast1:paws-api
+```
+
+`cloud-sql-proxy` を起動したまま、別ターミナルで以下を実行する。
+
+```bash
+PYTHONPATH=src python main.py
+```
 
 `DETECTOR_TYPE=orb` または `DETECTOR_TYPE=sift` を指定すると、同じ画像処理フローのまま検出器を切り替えられる。
 
