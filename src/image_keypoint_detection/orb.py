@@ -6,6 +6,7 @@ import cv2
 from image_keypoint_detection.common import (
     FeatureDetectionResult,
     build_mask,
+    decode_image_bytes,
     draw_keypoint_count_label,
     draw_mask_outline,
 )
@@ -36,6 +37,80 @@ def detect_orb_keypoints(
         raise ValueError(f"Failed to decode image: {image_path}")
 
     gray_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2GRAY)
+    return _detect_orb_keypoints(
+        image_name=str(path),
+        source_image=source_image,
+        gray_image=gray_image,
+        output_image_path=output_image_path,
+        mask_mode=mask_mode,
+        mask_center_x_ratio=mask_center_x_ratio,
+        mask_center_y_ratio=mask_center_y_ratio,
+        mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
+        nfeatures=nfeatures,
+        scale_factor=scale_factor,
+        nlevels=nlevels,
+        fast_threshold=fast_threshold,
+        edge_threshold=edge_threshold,
+    )
+
+
+def detect_orb_keypoints_from_bytes(
+    image_bytes: bytes,
+    *,
+    image_name: str,
+    output_image_path: str,
+    mask_mode: str,
+    mask_center_x_ratio: float,
+    mask_center_y_ratio: float,
+    mask_radius_ratio: float,
+    mask_radius_x_ratio: float,
+    mask_radius_y_ratio: float,
+    nfeatures: int,
+    scale_factor: float,
+    nlevels: int,
+    fast_threshold: int,
+    edge_threshold: int,
+) -> FeatureDetectionResult:
+    source_image, gray_image = decode_image_bytes(image_bytes)
+    return _detect_orb_keypoints(
+        image_name=image_name,
+        source_image=source_image,
+        gray_image=gray_image,
+        output_image_path=output_image_path,
+        mask_mode=mask_mode,
+        mask_center_x_ratio=mask_center_x_ratio,
+        mask_center_y_ratio=mask_center_y_ratio,
+        mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
+        nfeatures=nfeatures,
+        scale_factor=scale_factor,
+        nlevels=nlevels,
+        fast_threshold=fast_threshold,
+        edge_threshold=edge_threshold,
+    )
+
+
+def _detect_orb_keypoints(
+    *,
+    image_name: str,
+    source_image,
+    gray_image,
+    output_image_path: str,
+    mask_mode: str,
+    mask_center_x_ratio: float,
+    mask_center_y_ratio: float,
+    mask_radius_ratio: float,
+    mask_radius_x_ratio: float,
+    mask_radius_y_ratio: float,
+    nfeatures: int,
+    scale_factor: float,
+    nlevels: int,
+    fast_threshold: int,
+    edge_threshold: int,
+) -> FeatureDetectionResult:
     mask = build_mask(
         gray_image,
         mask_mode=mask_mode,
@@ -83,7 +158,7 @@ def detect_orb_keypoints(
     height, width = gray_image.shape[:2]
 
     return FeatureDetectionResult(
-        image_path=str(path),
+        image_path=image_name,
         output_image_path=str(output_path),
         keypoint_count=len(keypoints),
         width=width,

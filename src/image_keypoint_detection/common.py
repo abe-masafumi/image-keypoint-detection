@@ -20,6 +20,16 @@ class FeatureDetectionResult:
     detector_type: str
 
 
+def decode_image_bytes(image_bytes: bytes) -> tuple[np.ndarray, np.ndarray]:
+    buffer = np.frombuffer(image_bytes, dtype=np.uint8)
+    source_image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    if source_image is None:
+        raise ValueError("Failed to decode image bytes")
+
+    gray_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2GRAY)
+    return source_image, gray_image
+
+
 def collect_image_paths(input_path: str) -> list[Path]:
     path = Path(input_path)
     if not path.exists():

@@ -1,20 +1,31 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from image_keypoint_detection.config import AppConfig
 from image_keypoint_detection.common import (
     build_output_image_path,
     collect_image_paths,
 )
-from image_keypoint_detection.db import fetch_latest_nose_images
+from image_keypoint_detection.db import (
+    fetch_latest_nose_images,
+    fetch_nose_images_for_batch,
+)
 from image_keypoint_detection.logger import (
     build_error_fields,
     log_event,
     setup_logger,
 )
-from image_keypoint_detection.orb import detect_orb_keypoints
-from image_keypoint_detection.sift import detect_sift_keypoints
+from image_keypoint_detection.orb import (
+    detect_orb_keypoints,
+    detect_orb_keypoints_from_bytes,
+)
+from image_keypoint_detection.s3 import fetch_s3_object_bytes
+from image_keypoint_detection.sift import (
+    detect_sift_keypoints,
+    detect_sift_keypoints_from_bytes,
+)
 
 
 def main() -> int:
@@ -24,6 +35,8 @@ def main() -> int:
 
     if config.app_mode == "db_fetch_latest":
         return run_db_fetch_latest(config, logger, run_at)
+    if config.app_mode == "batch_prepare_keypoints":
+        return run_batch_prepare_keypoints(config, logger, run_at)
 
     if not config.image_path:
         print("IMAGE_PATH is not set")
@@ -247,4 +260,149 @@ def run_db_fetch_latest(config: AppConfig, logger, run_at: str) -> int:
         error_message="",
         stack_trace="",
     )
+    return 0
+
+
+def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
+    print("batch prepare keypoints")
+    print(f"DB_SOURCE_TABLE={config.db_schema}.{config.db_source_table}")
+    print(f"S3_BUCKET={config.s3_bucket}")
+    print(f"DB_FETCH_LIMIT={config.db_fetch_limit}")
+    print(f"DETECTOR_TYPE={config.detector_type}")
+
+    normalized_detector = config.detector_type.lower()
+    if normalized_detector not in {"orb", "sift"}:
+        print(f"Unsupported DETECTOR_TYPE: {config.detector_type}")
+        return 1
+
+    log_event(
+        logger,
+        event="batch_prepare_start",
+        executed_at=run_at,
+        db_schema=config.db_schema,
+        db_source_table=config.db_source_table,
+        s3_bucket=config.s3_bucket,
+        db_fetch_limit=config.db_fetch_limit,
+        detector_type=config.detector_type,
+        status="started",
+    )
+
+    try:
+        records = fetch_nose_images_for_batch(config, limit=config.db_fetch_limit)
+    except Exception as exc:
+        print(f"Batch source fetch failed: {exc}")
+        log_event(
+            logger,
+            event="batch_prepare_failure",
+            executed_at=run_at,
+            db_schema=config.db_schema,
+            db_source_table=config.db_source_table,
+            status="failure",
+            **build_error_fields(exc),
+        )
+        return 1
+
+    success_count = 0
+    failure_count = 0
+    skip_count = 0
+    total_keypoint_count = 0
+
+    for record in records:
+        output_image_path = build_output_image_path(
+            Path(record.object_key.split("/")[-1]),
+            input_path=config.db_source_table,
+            output_image_path=config.output_image_path,
+        )
+        try:
+            image_bytes = fetch_s3_object_bytes(
+                config.s3_bucket,
+                record.object_key,
+                aws_profile=config.aws_profile,
+            )
+            if normalized_detector == "orb":
+                result = detect_orb_keypoints_from_bytes(
+                    image_bytes,
+                    image_name=record.object_key,
+                    output_image_path=str(output_image_path),
+                    mask_mode=config.mask_mode,
+                    mask_center_x_ratio=config.mask_center_x_ratio,
+                    mask_center_y_ratio=config.mask_center_y_ratio,
+                    mask_radius_ratio=config.mask_radius_ratio,
+                    mask_radius_x_ratio=config.mask_radius_x_ratio,
+                    mask_radius_y_ratio=config.mask_radius_y_ratio,
+                    nfeatures=config.orb_nfeatures,
+                    scale_factor=config.orb_scale_factor,
+                    nlevels=config.orb_nlevels,
+                    fast_threshold=config.orb_fast_threshold,
+                    edge_threshold=config.orb_edge_threshold,
+                )
+            else:
+                result = detect_sift_keypoints_from_bytes(
+                    image_bytes,
+                    image_name=record.object_key,
+                    output_image_path=str(output_image_path),
+                    mask_mode=config.mask_mode,
+                    mask_center_x_ratio=config.mask_center_x_ratio,
+                    mask_center_y_ratio=config.mask_center_y_ratio,
+                    mask_radius_ratio=config.mask_radius_ratio,
+                    mask_radius_x_ratio=config.mask_radius_x_ratio,
+                    mask_radius_y_ratio=config.mask_radius_y_ratio,
+                    nfeatures=config.sift_nfeatures,
+                    contrast_threshold=config.sift_contrast_threshold,
+                    edge_threshold=config.sift_edge_threshold,
+                    sigma=config.sift_sigma,
+                )
+        except Exception as exc:
+            failure_count += 1
+            print(
+                f"id={record.id} object_key={record.object_key} "
+                f"status=failure error={exc}"
+            )
+            log_event(
+                logger,
+                event="batch_prepare_result",
+                executed_at=run_at,
+                id=record.id,
+                object_key=record.object_key,
+                status="failure",
+                **build_error_fields(exc),
+            )
+            continue
+
+        success_count += 1
+        total_keypoint_count += result.keypoint_count
+        print(
+            f"id={record.id} object_key={record.object_key} "
+            f"keypoint_count={result.keypoint_count} status=success"
+        )
+        log_event(
+            logger,
+            event="batch_prepare_result",
+            executed_at=run_at,
+            id=record.id,
+            object_key=record.object_key,
+            output_image_path=result.output_image_path,
+            keypoint_count=result.keypoint_count,
+            status="success",
+            error_message="",
+            stack_trace="",
+        )
+
+    log_event(
+        logger,
+        event="batch_prepare_summary",
+        executed_at=run_at,
+        total_record_count=len(records),
+        success_count=success_count,
+        failure_count=failure_count,
+        skip_count=skip_count,
+        total_keypoint_count=total_keypoint_count,
+        status="completed",
+        error_message="",
+        stack_trace="",
+    )
+    print(f"SUCCESS_COUNT={success_count}")
+    print(f"FAILURE_COUNT={failure_count}")
+    print(f"SKIP_COUNT={skip_count}")
+    print(f"TOTAL_KEYPOINT_COUNT={total_keypoint_count}")
     return 0

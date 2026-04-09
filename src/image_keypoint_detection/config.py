@@ -29,6 +29,7 @@ class AppConfig:
     sift_contrast_threshold: float
     sift_edge_threshold: float
     sift_sigma: float
+    aws_profile: str
     s3_bucket: str
     db_connection_type: str
     db_host: str
@@ -71,6 +72,7 @@ class AppConfig:
             ),
             sift_edge_threshold=float(os.getenv("SIFT_EDGE_THRESHOLD", "10")),
             sift_sigma=float(os.getenv("SIFT_SIGMA", "1.6")),
+            aws_profile=os.getenv("AWS_PROFILE", ""),
             s3_bucket=os.getenv("S3_BUCKET", "noseid-prod"),
             db_connection_type=os.getenv("DB_CONNECTION_TYPE", "public_ip"),
             db_host=os.getenv("DB_HOST", ""),

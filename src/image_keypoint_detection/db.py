@@ -66,3 +66,43 @@ def fetch_latest_nose_images(
         NoseImageRecord(id=row[0], object_key=row[1])
         for row in rows
     ]
+
+
+def fetch_nose_images_for_batch(
+    config: AppConfig,
+    *,
+    limit: int | None,
+) -> list[NoseImageRecord]:
+    if limit is None:
+        query = sql.SQL(
+            """
+            SELECT id, object_key
+            FROM {}.{}
+            ORDER BY id ASC
+            """
+        ).format(
+            sql.Identifier(config.db_schema),
+            sql.Identifier(config.db_source_table),
+        )
+    else:
+        query = sql.SQL(
+            """
+            SELECT id, object_key
+            FROM {}.{}
+            ORDER BY id ASC
+            LIMIT %s
+            """
+        ).format(
+            sql.Identifier(config.db_schema),
+            sql.Identifier(config.db_source_table),
+        )
+
+    with connect_postgres(config) as connection:
+        with connection.cursor() as cursor:
+            if limit is None:
+                cursor.execute(query)
+            else:
+                cursor.execute(query, (limit,))
+            rows = cursor.fetchall()
+
+    return [NoseImageRecord(id=row[0], object_key=row[1]) for row in rows]
