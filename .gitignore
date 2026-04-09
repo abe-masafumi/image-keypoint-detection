@@ -6,3 +6,6 @@ __pycache__/
 
 logs/*
 !logs/.gitkeep
+
+output_images/*
+!output_images/.gitkeep
