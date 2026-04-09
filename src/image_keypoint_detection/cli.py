@@ -7,6 +7,7 @@ from image_keypoint_detection.common import (
     build_output_image_path,
     collect_image_paths,
 )
+from image_keypoint_detection.db import fetch_latest_nose_images
 from image_keypoint_detection.logger import (
     build_error_fields,
     log_event,
@@ -20,6 +21,9 @@ def main() -> int:
     config = AppConfig.from_env()
     logger = setup_logger(config.log_path)
     run_at = datetime.now(timezone.utc).isoformat()
+
+    if config.app_mode == "db_fetch_latest":
+        return run_db_fetch_latest(config, logger, run_at)
 
     if not config.image_path:
         print("IMAGE_PATH is not set")
@@ -172,6 +176,73 @@ def main() -> int:
         success_count=success_count,
         failure_count=failure_count,
         total_keypoint_count=total_keypoints,
+        status="completed",
+        error_message="",
+        stack_trace="",
+    )
+    return 0
+
+
+def run_db_fetch_latest(config: AppConfig, logger, run_at: str) -> int:
+    print("db latest records fetch")
+    print(f"DB_CONNECTION_TYPE={config.db_connection_type}")
+    print(f"DB_HOST={config.db_host}")
+    print(f"DB_PORT={config.db_port}")
+    print(f"DB_NAME={config.db_name}")
+    print(f"DB_SCHEMA={config.db_schema}")
+    print(f"DB_SOURCE_TABLE={config.db_source_table}")
+    print(f"DB_FETCH_LIMIT={config.db_fetch_limit}")
+
+    log_event(
+        logger,
+        event="db_fetch_start",
+        executed_at=run_at,
+        db_connection_type=config.db_connection_type,
+        db_host=config.db_host,
+        db_port=config.db_port,
+        db_name=config.db_name,
+        db_schema=config.db_schema,
+        db_source_table=config.db_source_table,
+        db_fetch_limit=config.db_fetch_limit,
+        status="started",
+    )
+
+    try:
+        records = fetch_latest_nose_images(config, limit=config.db_fetch_limit)
+    except Exception as exc:
+        print(f"DB fetch failed: {exc}")
+        log_event(
+            logger,
+            event="db_fetch_failure",
+            executed_at=run_at,
+            db_schema=config.db_schema,
+            db_source_table=config.db_source_table,
+            db_fetch_limit=config.db_fetch_limit,
+            status="failure",
+            **build_error_fields(exc),
+        )
+        return 1
+
+    for record in records:
+        print(f"id={record.id} object_key={record.object_key}")
+        log_event(
+            logger,
+            event="db_fetch_record",
+            executed_at=run_at,
+            id=record.id,
+            object_key=record.object_key,
+            status="success",
+            error_message="",
+            stack_trace="",
+        )
+
+    log_event(
+        logger,
+        event="db_fetch_summary",
+        executed_at=run_at,
+        db_schema=config.db_schema,
+        db_source_table=config.db_source_table,
+        fetched_count=len(records),
         status="completed",
         error_message="",
         stack_trace="",
