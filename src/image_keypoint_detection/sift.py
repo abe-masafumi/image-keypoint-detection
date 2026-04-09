@@ -20,6 +20,8 @@ def detect_sift_keypoints(
     mask_center_x_ratio: float,
     mask_center_y_ratio: float,
     mask_radius_ratio: float,
+    mask_radius_x_ratio: float,
+    mask_radius_y_ratio: float,
     nfeatures: int,
     contrast_threshold: float,
     edge_threshold: float,
@@ -40,6 +42,8 @@ def detect_sift_keypoints(
         mask_center_x_ratio=mask_center_x_ratio,
         mask_center_y_ratio=mask_center_y_ratio,
         mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
     )
     sift = cv2.SIFT_create(
         nfeatures=nfeatures,
@@ -58,6 +62,8 @@ def detect_sift_keypoints(
         mask_center_x_ratio=mask_center_x_ratio,
         mask_center_y_ratio=mask_center_y_ratio,
         mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
     )
     for keypoint in keypoints:
         x, y = keypoint.pt

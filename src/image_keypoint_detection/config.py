@@ -17,6 +17,8 @@ class AppConfig:
     mask_center_x_ratio: float
     mask_center_y_ratio: float
     mask_radius_ratio: float
+    mask_radius_x_ratio: float
+    mask_radius_y_ratio: float
     orb_nfeatures: int
     orb_scale_factor: float
     orb_nlevels: int
@@ -49,6 +51,8 @@ class AppConfig:
             mask_center_x_ratio=float(os.getenv("MASK_CENTER_X_RATIO", "0.5")),
             mask_center_y_ratio=float(os.getenv("MASK_CENTER_Y_RATIO", "0.5")),
             mask_radius_ratio=float(os.getenv("MASK_RADIUS_RATIO", "0.35")),
+            mask_radius_x_ratio=float(os.getenv("MASK_RADIUS_X_RATIO", "0.45")),
+            mask_radius_y_ratio=float(os.getenv("MASK_RADIUS_Y_RATIO", "0.35")),
             orb_nfeatures=int(os.getenv("ORB_NFEATURES", "500")),
             orb_scale_factor=float(os.getenv("ORB_SCALE_FACTOR", "1.2")),
             orb_nlevels=int(os.getenv("ORB_NLEVELS", "8")),

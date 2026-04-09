@@ -19,6 +19,8 @@ def detect_orb_keypoints(
     mask_center_x_ratio: float,
     mask_center_y_ratio: float,
     mask_radius_ratio: float,
+    mask_radius_x_ratio: float,
+    mask_radius_y_ratio: float,
     nfeatures: int,
     scale_factor: float,
     nlevels: int,
@@ -40,6 +42,8 @@ def detect_orb_keypoints(
         mask_center_x_ratio=mask_center_x_ratio,
         mask_center_y_ratio=mask_center_y_ratio,
         mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
     )
     orb = cv2.ORB_create(
         nfeatures=nfeatures,
@@ -59,6 +63,8 @@ def detect_orb_keypoints(
         mask_center_x_ratio=mask_center_x_ratio,
         mask_center_y_ratio=mask_center_y_ratio,
         mask_radius_ratio=mask_radius_ratio,
+        mask_radius_x_ratio=mask_radius_x_ratio,
+        mask_radius_y_ratio=mask_radius_y_ratio,
     )
     for keypoint in keypoints:
         x, y = keypoint.pt

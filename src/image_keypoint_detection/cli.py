@@ -29,6 +29,8 @@ def main() -> int:
     print(f"MASK_CENTER_X_RATIO={config.mask_center_x_ratio}")
     print(f"MASK_CENTER_Y_RATIO={config.mask_center_y_ratio}")
     print(f"MASK_RADIUS_RATIO={config.mask_radius_ratio}")
+    print(f"MASK_RADIUS_X_RATIO={config.mask_radius_x_ratio}")
+    print(f"MASK_RADIUS_Y_RATIO={config.mask_radius_y_ratio}")
 
     normalized_detector = config.detector_type.lower()
     if normalized_detector == "orb":
@@ -62,6 +64,8 @@ def main() -> int:
                     mask_center_x_ratio=config.mask_center_x_ratio,
                     mask_center_y_ratio=config.mask_center_y_ratio,
                     mask_radius_ratio=config.mask_radius_ratio,
+                    mask_radius_x_ratio=config.mask_radius_x_ratio,
+                    mask_radius_y_ratio=config.mask_radius_y_ratio,
                     nfeatures=config.orb_nfeatures,
                     scale_factor=config.orb_scale_factor,
                     nlevels=config.orb_nlevels,
@@ -76,6 +80,8 @@ def main() -> int:
                     mask_center_x_ratio=config.mask_center_x_ratio,
                     mask_center_y_ratio=config.mask_center_y_ratio,
                     mask_radius_ratio=config.mask_radius_ratio,
+                    mask_radius_x_ratio=config.mask_radius_x_ratio,
+                    mask_radius_y_ratio=config.mask_radius_y_ratio,
                     nfeatures=config.sift_nfeatures,
                     contrast_threshold=config.sift_contrast_threshold,
                     edge_threshold=config.sift_edge_threshold,
