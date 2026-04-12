@@ -12,7 +12,7 @@ pip install -r requirements.txt
 ```
 
 3. 環境変数を設定する
-   `.env.example` を参考に `.env` を作成し、`APP_MODE`、`LOG_PATH`、`IMAGE_PATH`、`OUTPUT_IMAGE_PATH`、`DETECTOR_TYPE`、`MASK_MODE`、`MASK_CENTER_X_RATIO`、`MASK_CENTER_Y_RATIO`、`MASK_RADIUS_RATIO`、`MASK_RADIUS_X_RATIO`、`MASK_RADIUS_Y_RATIO`、ORB / SIFT の各パラメータ、`S3_BUCKET`、DB 接続情報を設定する
+   `.env.example` を参考に `.env` を作成し、`APP_MODE`、`LOG_PATH`、`IMAGE_PATH`、`OUTPUT_IMAGE_PATH`、`DETECTOR_TYPE`、`MASK_MODE`、`MASK_CENTER_X_RATIO`、`MASK_CENTER_Y_RATIO`、`MASK_RADIUS_RATIO`、`MASK_RADIUS_X_RATIO`、`MASK_RADIUS_Y_RATIO`、ORB / SIFT の各パラメータ、`AWS_PROFILE`、`S3_BUCKET`、DB 接続情報を設定する
 
 ## Run
 `PYTHONPATH=src python main.py`
@@ -20,6 +20,10 @@ pip install -r requirements.txt
 `IMAGE_PATH` には画像ファイルかディレクトリを指定できる。`sample_images` のようなディレクトリを指定すると、その配下の画像をすべて処理し、`OUTPUT_IMAGE_PATH` に指定したディレクトリへ `{元ファイル名}_keypoints.jpg` の形式で出力する。
 
 `APP_MODE=db_fetch_latest` にすると、PostgreSQL に接続して `DB_SOURCE_TABLE` から最新データを取得する。`DB_FETCH_LIMIT` を指定した場合はその件数だけ取得し、未指定の場合は全件取得する。この仮実装は読み取り専用で、更新処理と削除処理は含まない。
+
+`APP_MODE=batch_prepare_keypoints` にすると、`DB_SOURCE_TABLE` から対象データを取得し、`S3_BUCKET` から画像を取得して ORB / SIFT の keypoint 数を算出する。DB 更新は行わず、`id`、`object_key`、`keypoint_count`、`status` を標準出力とログへ出力する更新前バッチとして動作する。実行件数は環境変数 `DB_FETCH_LIMIT` で制御し、未指定の場合は全件取得する。
+
+S3 接続で named profile を使う場合は `AWS_PROFILE` を設定する。例: `AWS_PROFILE=nose-id-prod`
 
 `APP_MODE=image_keypoint` で画像から keypoint を取得する。`APP_MODE=db_fetch_latest` で DB から最新データを取得する。実行コマンドは同じで、`.env` の `APP_MODE` だけを切り替える。
 
