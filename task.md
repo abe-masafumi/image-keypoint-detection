@@ -126,6 +126,24 @@
 - 1件ごとの成功 / 失敗を判定する
 - 失敗しても全体処理を継続できるようにする
 - 実行件数、成功件数、失敗件数、スキップ件数を集計する
+- 本番更新対応時の実装方針を以下とする
+  - `APP_MODE` はバッチ用で統一し、dry-run の有無は `BATCH_DRY_RUN=true/false` で切り替える
+  - `BATCH_DRY_RUN=true`
+    - DB 更新は行わない
+    - `id`, `object_key`, `keypoint_count`, `status` を標準出力とログへ出力する
+  - `BATCH_DRY_RUN=false`
+    - `keypoints_orb` へ実際に更新する
+  - 取得対象は `keypoints_orb IS NULL` のみとする
+  - 取得順は `ORDER BY id ASC` で固定する
+  - 実行件数は `DB_FETCH_LIMIT` で制御する
+  - 更新 SQL は `WHERE id = %s AND keypoints_orb IS NULL` を含める
+    - 途中停止後の再実行時に更新済みデータを自然にスキップできるようにする
+  - 更新は 1件ごとに実施し、成功したものから順にコミットする
+  - 1件失敗しても全体は継続し、失敗内容はログへ残す
+  - `keypoints_orb` カラムを持つ更新先テーブルは、読み取り元テーブルとは別に指定できるようにする
+    - 更新先テーブル名は環境変数で指定する
+    - 例: `DB_UPDATE_TABLE`
+  - `keypoints_orb` カラムを持つ更新先テーブルが未作成の場合は、本番更新処理を有効化しない
 
 ### 9. バッチ向けログ出力
 ブランチ名：`feature/09-batch-logging`
