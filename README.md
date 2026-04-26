@@ -19,13 +19,75 @@ pip install -r requirements.txt
 
 `IMAGE_PATH` には画像ファイルかディレクトリを指定できる。`sample_images` のようなディレクトリを指定すると、その配下の画像をすべて処理し、`OUTPUT_IMAGE_PATH` に指定したディレクトリへ `{元ファイル名}_keypoints.jpg` の形式で出力する。
 
-`APP_MODE=db_fetch_latest` にすると、PostgreSQL に接続して `DB_SOURCE_TABLE` から最新データを取得する。`DB_FETCH_LIMIT` を指定した場合はその件数だけ取得し、未指定の場合は全件取得する。この仮実装は読み取り専用で、更新処理と削除処理は含まない。
-
-`APP_MODE=batch_prepare_keypoints` にすると、`DB_SOURCE_TABLE` から対象データを取得し、`S3_BUCKET` から画像を取得して ORB / SIFT の keypoint 数を算出する。DB 更新は行わず、`id`、`object_key`、`keypoint_count`、`status` を標準出力とログへ出力する更新前バッチとして動作する。実行件数は環境変数 `DB_FETCH_LIMIT` で制御し、未指定の場合は全件取得する。
-
 S3 接続で named profile を使う場合は `AWS_PROFILE` を設定する。例: `AWS_PROFILE=nose-id-prod`
 
-`APP_MODE=image_keypoint` で画像から keypoint を取得する。`APP_MODE=db_fetch_latest` で DB から最新データを取得する。実行コマンドは同じで、`.env` の `APP_MODE` だけを切り替える。
+実行コマンドは同じで、`.env` の `APP_MODE` だけを切り替える。
+
+### APP_MODE=image_keypoint
+ローカル画像を対象に keypoint を取得する。
+
+実行内容:
+- `IMAGE_PATH` から画像ファイルまたはディレクトリを読む
+- `DETECTOR_TYPE` に応じて ORB / SIFT で `keypoint_count` を算出する
+- 出力画像を `OUTPUT_IMAGE_PATH` 配下に保存する
+- 標準出力とログへ結果を出力する
+
+主な入力:
+- `IMAGE_PATH`
+- `OUTPUT_IMAGE_PATH`
+- `DETECTOR_TYPE`
+- `MASK_MODE`
+- ORB / SIFT の各パラメータ
+
+### APP_MODE=db_fetch_latest
+DB からレコード取得だけを行う読み取り専用モード。
+
+実行内容:
+- PostgreSQL に接続する
+- `DB_SOURCE_TABLE` から `id`, `object_key` を取得する
+- `DB_FETCH_LIMIT` を指定した場合はその件数だけ取得する
+- `DB_FETCH_LIMIT` 未指定の場合は全件取得する
+- 標準出力とログへ結果を出力する
+
+補足:
+- このモードは読み取り専用
+- 更新処理と削除処理は含まない
+
+主な入力:
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_SCHEMA`
+- `DB_SOURCE_TABLE`
+- `DB_FETCH_LIMIT`
+
+### APP_MODE=batch_prepare_keypoints
+更新前の dry-run 相当として動くバッチモード。
+
+実行内容:
+- DB から `id`, `object_key` を取得する
+- `object_key` を使って `S3_BUCKET` から画像を取得する
+- `DETECTOR_TYPE` に応じて ORB / SIFT で `keypoint_count` を算出する
+- 出力画像を `OUTPUT_IMAGE_PATH` 配下に保存する
+- 標準出力とログへ `id`, `object_key`, `keypoint_count`, `status` を出力する
+- 最後に成功件数、失敗件数、スキップ件数、合計 keypoint 数を出力する
+
+補足:
+- DB 更新は行わない
+- `keypoints_orb` は更新しない
+- 実行件数は `DB_FETCH_LIMIT` で制御する
+- `DB_FETCH_LIMIT` 未指定の場合は全件取得する
+
+主な入力:
+- `DB_SOURCE_TABLE`
+- `DB_FETCH_LIMIT`
+- `S3_BUCKET`
+- `AWS_PROFILE`
+- `DETECTOR_TYPE`
+- `OUTPUT_IMAGE_PATH`
+- ORB / SIFT の各パラメータ
 
 ## Cloud SQL Auth Proxy
 Cloud SQL へ `APP_MODE=db_fetch_latest` で接続する場合は、先に `cloud-sql-proxy` を起動する必要がある。
@@ -67,8 +129,12 @@ ORB の主な設定:
 - `ORB_NFEATURES`
 - `ORB_SCALE_FACTOR`
 - `ORB_NLEVELS`
-- `ORB_FAST_THRESHOLD`
 - `ORB_EDGE_THRESHOLD`
+- `ORB_FIRST_LEVEL`
+- `ORB_WTA_K`
+- `ORB_SCORE_TYPE`
+- `ORB_PATCH_SIZE`
+- `ORB_FAST_THRESHOLD`
 
 SIFT の主な設定:
 - `SIFT_NFEATURES`

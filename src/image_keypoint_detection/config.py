@@ -23,8 +23,12 @@ class AppConfig:
     orb_nfeatures: int
     orb_scale_factor: float
     orb_nlevels: int
-    orb_fast_threshold: int
     orb_edge_threshold: int
+    orb_first_level: int
+    orb_wta_k: int
+    orb_score_type: str
+    orb_patch_size: int
+    orb_fast_threshold: int
     sift_nfeatures: int
     sift_contrast_threshold: float
     sift_edge_threshold: float
@@ -61,11 +65,15 @@ class AppConfig:
             mask_radius_ratio=float(os.getenv("MASK_RADIUS_RATIO", "0.35")),
             mask_radius_x_ratio=float(os.getenv("MASK_RADIUS_X_RATIO", "0.45")),
             mask_radius_y_ratio=float(os.getenv("MASK_RADIUS_Y_RATIO", "0.35")),
-            orb_nfeatures=int(os.getenv("ORB_NFEATURES", "500")),
+            orb_nfeatures=int(os.getenv("ORB_NFEATURES", "2000")),
             orb_scale_factor=float(os.getenv("ORB_SCALE_FACTOR", "1.2")),
             orb_nlevels=int(os.getenv("ORB_NLEVELS", "8")),
-            orb_fast_threshold=int(os.getenv("ORB_FAST_THRESHOLD", "20")),
             orb_edge_threshold=int(os.getenv("ORB_EDGE_THRESHOLD", "31")),
+            orb_first_level=int(os.getenv("ORB_FIRST_LEVEL", "0")),
+            orb_wta_k=int(os.getenv("ORB_WTA_K", "2")),
+            orb_score_type=os.getenv("ORB_SCORE_TYPE", "HARRIS_SCORE"),
+            orb_patch_size=int(os.getenv("ORB_PATCH_SIZE", "31")),
+            orb_fast_threshold=int(os.getenv("ORB_FAST_THRESHOLD", "20")),
             sift_nfeatures=int(os.getenv("SIFT_NFEATURES", "0")),
             sift_contrast_threshold=float(
                 os.getenv("SIFT_CONTRAST_THRESHOLD", "0.04")

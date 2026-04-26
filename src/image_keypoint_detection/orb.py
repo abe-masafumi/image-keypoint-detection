@@ -25,8 +25,12 @@ def detect_orb_keypoints(
     nfeatures: int,
     scale_factor: float,
     nlevels: int,
-    fast_threshold: int,
     edge_threshold: int,
+    first_level: int,
+    wta_k: int,
+    score_type: str,
+    patch_size: int,
+    fast_threshold: int,
 ) -> FeatureDetectionResult:
     path = Path(image_path)
     if not path.is_file():
@@ -51,8 +55,12 @@ def detect_orb_keypoints(
         nfeatures=nfeatures,
         scale_factor=scale_factor,
         nlevels=nlevels,
-        fast_threshold=fast_threshold,
         edge_threshold=edge_threshold,
+        first_level=first_level,
+        wta_k=wta_k,
+        score_type=score_type,
+        patch_size=patch_size,
+        fast_threshold=fast_threshold,
     )
 
 
@@ -70,8 +78,12 @@ def detect_orb_keypoints_from_bytes(
     nfeatures: int,
     scale_factor: float,
     nlevels: int,
-    fast_threshold: int,
     edge_threshold: int,
+    first_level: int,
+    wta_k: int,
+    score_type: str,
+    patch_size: int,
+    fast_threshold: int,
 ) -> FeatureDetectionResult:
     source_image, gray_image = decode_image_bytes(image_bytes)
     return _detect_orb_keypoints(
@@ -88,8 +100,12 @@ def detect_orb_keypoints_from_bytes(
         nfeatures=nfeatures,
         scale_factor=scale_factor,
         nlevels=nlevels,
-        fast_threshold=fast_threshold,
         edge_threshold=edge_threshold,
+        first_level=first_level,
+        wta_k=wta_k,
+        score_type=score_type,
+        patch_size=patch_size,
+        fast_threshold=fast_threshold,
     )
 
 
@@ -108,8 +124,12 @@ def _detect_orb_keypoints(
     nfeatures: int,
     scale_factor: float,
     nlevels: int,
-    fast_threshold: int,
     edge_threshold: int,
+    first_level: int,
+    wta_k: int,
+    score_type: str,
+    patch_size: int,
+    fast_threshold: int,
 ) -> FeatureDetectionResult:
     mask = build_mask(
         gray_image,
@@ -125,6 +145,10 @@ def _detect_orb_keypoints(
         scaleFactor=scale_factor,
         nlevels=nlevels,
         edgeThreshold=edge_threshold,
+        firstLevel=first_level,
+        WTA_K=wta_k,
+        scoreType=_resolve_orb_score_type(score_type),
+        patchSize=patch_size,
         fastThreshold=fast_threshold,
     )
     keypoints, _ = orb.detectAndCompute(gray_image, mask)
@@ -165,4 +189,15 @@ def _detect_orb_keypoints(
         height=height,
         mask_mode=mask_mode,
         detector_type="orb",
+    )
+
+
+def _resolve_orb_score_type(score_type: str) -> int:
+    normalized = score_type.strip().upper()
+    if normalized == "HARRIS_SCORE":
+        return cv2.ORB_HARRIS_SCORE
+    if normalized == "FAST_SCORE":
+        return cv2.ORB_FAST_SCORE
+    raise ValueError(
+        "Unsupported ORB_SCORE_TYPE. Use HARRIS_SCORE or FAST_SCORE."
     )

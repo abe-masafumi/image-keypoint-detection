@@ -79,8 +79,12 @@ def main() -> int:
         print(f"ORB_NFEATURES={config.orb_nfeatures}")
         print(f"ORB_SCALE_FACTOR={config.orb_scale_factor}")
         print(f"ORB_NLEVELS={config.orb_nlevels}")
-        print(f"ORB_FAST_THRESHOLD={config.orb_fast_threshold}")
         print(f"ORB_EDGE_THRESHOLD={config.orb_edge_threshold}")
+        print(f"ORB_FIRST_LEVEL={config.orb_first_level}")
+        print(f"ORB_WTA_K={config.orb_wta_k}")
+        print(f"ORB_SCORE_TYPE={config.orb_score_type}")
+        print(f"ORB_PATCH_SIZE={config.orb_patch_size}")
+        print(f"ORB_FAST_THRESHOLD={config.orb_fast_threshold}")
     elif normalized_detector == "sift":
         print(f"SIFT_NFEATURES={config.sift_nfeatures}")
         print(f"SIFT_CONTRAST_THRESHOLD={config.sift_contrast_threshold}")
@@ -129,8 +133,12 @@ def main() -> int:
                     nfeatures=config.orb_nfeatures,
                     scale_factor=config.orb_scale_factor,
                     nlevels=config.orb_nlevels,
-                    fast_threshold=config.orb_fast_threshold,
                     edge_threshold=config.orb_edge_threshold,
+                    first_level=config.orb_first_level,
+                    wta_k=config.orb_wta_k,
+                    score_type=config.orb_score_type,
+                    patch_size=config.orb_patch_size,
+                    fast_threshold=config.orb_fast_threshold,
                 )
             else:
                 result = detect_sift_keypoints(
@@ -333,8 +341,12 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
                     nfeatures=config.orb_nfeatures,
                     scale_factor=config.orb_scale_factor,
                     nlevels=config.orb_nlevels,
-                    fast_threshold=config.orb_fast_threshold,
                     edge_threshold=config.orb_edge_threshold,
+                    first_level=config.orb_first_level,
+                    wta_k=config.orb_wta_k,
+                    score_type=config.orb_score_type,
+                    patch_size=config.orb_patch_size,
+                    fast_threshold=config.orb_fast_threshold,
                 )
             else:
                 result = detect_sift_keypoints_from_bytes(
