@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class AppConfig:
     app_mode: str
+    batch_dry_run: bool
     log_path: str
     image_path: str
     output_image_path: str
@@ -42,9 +43,11 @@ class AppConfig:
     db_user: str
     db_password: str
     db_schema: str
+    db_registration_table: str
     db_source_table: str
     db_update_table: str
     db_fetch_limit: int | None
+    db_update_app_version: str | None
     db_instance_connection_name: str
 
     @classmethod
@@ -52,6 +55,7 @@ class AppConfig:
         load_dotenv(dotenv_path=Path(".env"), override=False)
         return cls(
             app_mode=os.getenv("APP_MODE", "image_keypoint"),
+            batch_dry_run=_get_bool("BATCH_DRY_RUN", default=True),
             log_path=os.getenv("LOG_PATH", "logs/app.log"),
             image_path=os.getenv("IMAGE_PATH", ""),
             output_image_path=os.getenv(
@@ -89,9 +93,14 @@ class AppConfig:
             db_user=os.getenv("DB_USER", ""),
             db_password=os.getenv("DB_PASSWORD", ""),
             db_schema=os.getenv("DB_SCHEMA", "public"),
+            db_registration_table=os.getenv(
+                "DB_REGISTRATION_TABLE",
+                "nose_registrations",
+            ),
             db_source_table=os.getenv("DB_SOURCE_TABLE", "nose_images"),
-            db_update_table=os.getenv("DB_UPDATE_TABLE", "nose_images"),
+            db_update_table=os.getenv("DB_UPDATE_TABLE", "nose_image_quality"),
             db_fetch_limit=_get_optional_int("DB_FETCH_LIMIT"),
+            db_update_app_version=_get_optional_str("DB_UPDATE_APP_VERSION"),
             db_instance_connection_name=os.getenv(
                 "DB_INSTANCE_CONNECTION_NAME",
                 "",
@@ -104,3 +113,24 @@ def _get_optional_int(name: str) -> int | None:
     if not value:
         return None
     return int(value)
+
+
+def _get_optional_str(name: str) -> str | None:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    return value
+
+
+def _get_bool(name: str, *, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    raise ValueError(f"Invalid boolean value for {name}: {value}")

@@ -11,6 +11,8 @@ from image_keypoint_detection.common import (
 from image_keypoint_detection.db import (
     fetch_latest_nose_images,
     fetch_nose_images_for_batch,
+    insert_nose_image_quality,
+    connect_postgres,
 )
 from image_keypoint_detection.logger import (
     build_error_fields,
@@ -273,7 +275,10 @@ def run_db_fetch_latest(config: AppConfig, logger, run_at: str) -> int:
 
 def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
     print("batch prepare keypoints")
+    print(f"BATCH_DRY_RUN={config.batch_dry_run}")
+    print(f"DB_REGISTRATION_TABLE={config.db_schema}.{config.db_registration_table}")
     print(f"DB_SOURCE_TABLE={config.db_schema}.{config.db_source_table}")
+    print(f"DB_UPDATE_TABLE={config.db_schema}.{config.db_update_table}")
     print(f"S3_BUCKET={config.s3_bucket}")
     print(f"DB_FETCH_LIMIT={config.db_fetch_limit}")
     print(f"DETECTOR_TYPE={config.detector_type}")
@@ -287,8 +292,11 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
         logger,
         event="batch_prepare_start",
         executed_at=run_at,
+        batch_dry_run=config.batch_dry_run,
+        db_registration_table=config.db_registration_table,
         db_schema=config.db_schema,
         db_source_table=config.db_source_table,
+        db_update_table=config.db_update_table,
         s3_bucket=config.s3_bucket,
         db_fetch_limit=config.db_fetch_limit,
         detector_type=config.detector_type,
@@ -303,8 +311,11 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
             logger,
             event="batch_prepare_failure",
             executed_at=run_at,
+            batch_dry_run=config.batch_dry_run,
+            db_registration_table=config.db_registration_table,
             db_schema=config.db_schema,
             db_source_table=config.db_source_table,
+            db_update_table=config.db_update_table,
             status="failure",
             **build_error_fields(exc),
         )
@@ -314,100 +325,212 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
     failure_count = 0
     skip_count = 0
     total_keypoint_count = 0
+    inserted_count = 0
 
-    for record in records:
-        output_image_path = build_output_image_path(
-            Path(record.object_key.split("/")[-1]),
-            input_path=config.db_source_table,
-            output_image_path=config.output_image_path,
-        )
+    connection = None
+    if not config.batch_dry_run:
         try:
-            image_bytes = fetch_s3_object_bytes(
-                config.s3_bucket,
-                record.object_key,
-                aws_profile=config.aws_profile,
-            )
-            if normalized_detector == "orb":
-                result = detect_orb_keypoints_from_bytes(
-                    image_bytes,
-                    image_name=record.object_key,
-                    output_image_path=str(output_image_path),
-                    mask_mode=config.mask_mode,
-                    mask_center_x_ratio=config.mask_center_x_ratio,
-                    mask_center_y_ratio=config.mask_center_y_ratio,
-                    mask_radius_ratio=config.mask_radius_ratio,
-                    mask_radius_x_ratio=config.mask_radius_x_ratio,
-                    mask_radius_y_ratio=config.mask_radius_y_ratio,
-                    nfeatures=config.orb_nfeatures,
-                    scale_factor=config.orb_scale_factor,
-                    nlevels=config.orb_nlevels,
-                    edge_threshold=config.orb_edge_threshold,
-                    first_level=config.orb_first_level,
-                    wta_k=config.orb_wta_k,
-                    score_type=config.orb_score_type,
-                    patch_size=config.orb_patch_size,
-                    fast_threshold=config.orb_fast_threshold,
-                )
-            else:
-                result = detect_sift_keypoints_from_bytes(
-                    image_bytes,
-                    image_name=record.object_key,
-                    output_image_path=str(output_image_path),
-                    mask_mode=config.mask_mode,
-                    mask_center_x_ratio=config.mask_center_x_ratio,
-                    mask_center_y_ratio=config.mask_center_y_ratio,
-                    mask_radius_ratio=config.mask_radius_ratio,
-                    mask_radius_x_ratio=config.mask_radius_x_ratio,
-                    mask_radius_y_ratio=config.mask_radius_y_ratio,
-                    nfeatures=config.sift_nfeatures,
-                    contrast_threshold=config.sift_contrast_threshold,
-                    edge_threshold=config.sift_edge_threshold,
-                    sigma=config.sift_sigma,
-                )
+            connection = connect_postgres(config)
         except Exception as exc:
-            failure_count += 1
+            print(f"Batch update connection failed: {exc}")
+            log_event(
+                logger,
+                event="batch_prepare_failure",
+                executed_at=run_at,
+                batch_dry_run=config.batch_dry_run,
+                db_registration_table=config.db_registration_table,
+                db_schema=config.db_schema,
+                db_source_table=config.db_source_table,
+                db_update_table=config.db_update_table,
+                status="failure",
+                **build_error_fields(exc),
+            )
+            return 1
+
+    try:
+        for record in records:
+            if (
+                record.latest_image_count != 1
+                or record.nose_image_id is None
+                or not record.object_key
+            ):
+                skip_count += 1
+                error_message = (
+                    "Skipped because latest image count is not exactly 1"
+                )
+                print(
+                    f"noseprint_id={record.noseprint_id} "
+                    f"latest_image_count={record.latest_image_count} "
+                    f"status=skipped reason=\"{error_message}\""
+                )
+                log_event(
+                    logger,
+                    event="batch_prepare_result",
+                    executed_at=run_at,
+                    nose_image_id=record.nose_image_id,
+                    noseprint_id=record.noseprint_id,
+                    object_key=record.object_key or "",
+                    latest_image_count=record.latest_image_count,
+                    status="skipped",
+                    error_message=error_message,
+                    stack_trace="",
+                )
+                continue
+
+            output_image_path = build_output_image_path(
+                Path(record.object_key.split("/")[-1]),
+                input_path=config.db_source_table,
+                output_image_path=config.output_image_path,
+            )
+            try:
+                image_bytes = fetch_s3_object_bytes(
+                    config.s3_bucket,
+                    record.object_key,
+                    aws_profile=config.aws_profile,
+                )
+                if normalized_detector == "orb":
+                    result = detect_orb_keypoints_from_bytes(
+                        image_bytes,
+                        image_name=record.object_key,
+                        output_image_path=str(output_image_path),
+                        mask_mode=config.mask_mode,
+                        mask_center_x_ratio=config.mask_center_x_ratio,
+                        mask_center_y_ratio=config.mask_center_y_ratio,
+                        mask_radius_ratio=config.mask_radius_ratio,
+                        mask_radius_x_ratio=config.mask_radius_x_ratio,
+                        mask_radius_y_ratio=config.mask_radius_y_ratio,
+                        nfeatures=config.orb_nfeatures,
+                        scale_factor=config.orb_scale_factor,
+                        nlevels=config.orb_nlevels,
+                        edge_threshold=config.orb_edge_threshold,
+                        first_level=config.orb_first_level,
+                        wta_k=config.orb_wta_k,
+                        score_type=config.orb_score_type,
+                        patch_size=config.orb_patch_size,
+                        fast_threshold=config.orb_fast_threshold,
+                    )
+                else:
+                    result = detect_sift_keypoints_from_bytes(
+                        image_bytes,
+                        image_name=record.object_key,
+                        output_image_path=str(output_image_path),
+                        mask_mode=config.mask_mode,
+                        mask_center_x_ratio=config.mask_center_x_ratio,
+                        mask_center_y_ratio=config.mask_center_y_ratio,
+                        mask_radius_ratio=config.mask_radius_ratio,
+                        mask_radius_x_ratio=config.mask_radius_x_ratio,
+                        mask_radius_y_ratio=config.mask_radius_y_ratio,
+                        nfeatures=config.sift_nfeatures,
+                        contrast_threshold=config.sift_contrast_threshold,
+                        edge_threshold=config.sift_edge_threshold,
+                        sigma=config.sift_sigma,
+                    )
+            except Exception as exc:
+                failure_count += 1
+                print(
+                    f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                    f"object_key={record.object_key} status=failure error={exc}"
+                )
+                log_event(
+                    logger,
+                    event="batch_prepare_result",
+                    executed_at=run_at,
+                    nose_image_id=record.nose_image_id,
+                    noseprint_id=record.noseprint_id,
+                    object_key=record.object_key,
+                    status="failure",
+                    **build_error_fields(exc),
+                )
+                continue
+
+            if not config.batch_dry_run:
+                try:
+                    inserted = insert_nose_image_quality(
+                        connection,
+                        config,
+                        noseprint_id=record.noseprint_id,
+                        keypoints_orb=result.keypoint_count,
+                        app_version=config.db_update_app_version,
+                    )
+                    connection.commit()
+                except Exception as exc:
+                    connection.rollback()
+                    failure_count += 1
+                    print(
+                        f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                        f"object_key={record.object_key} status=failure error={exc}"
+                    )
+                    log_event(
+                        logger,
+                        event="batch_prepare_result",
+                        executed_at=run_at,
+                        nose_image_id=record.nose_image_id,
+                        noseprint_id=record.noseprint_id,
+                        object_key=record.object_key,
+                        keypoint_count=result.keypoint_count,
+                        status="failure",
+                        **build_error_fields(exc),
+                    )
+                    continue
+
+                if inserted:
+                    inserted_count += 1
+                else:
+                    skip_count += 1
+                    print(
+                        f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                        f"object_key={record.object_key} keypoint_count={result.keypoint_count} "
+                        "status=skipped reason=\"nose_image_quality already exists\""
+                    )
+                    log_event(
+                        logger,
+                        event="batch_prepare_result",
+                        executed_at=run_at,
+                        nose_image_id=record.nose_image_id,
+                        noseprint_id=record.noseprint_id,
+                        object_key=record.object_key,
+                        output_image_path=result.output_image_path,
+                        keypoint_count=result.keypoint_count,
+                        status="skipped",
+                        error_message="nose_image_quality already exists",
+                        stack_trace="",
+                    )
+                    continue
+
+            success_count += 1
+            total_keypoint_count += result.keypoint_count
             print(
-                f"id={record.id} object_key={record.object_key} "
-                f"status=failure error={exc}"
+                f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                f"object_key={record.object_key} keypoint_count={result.keypoint_count} "
+                f"status=success"
             )
             log_event(
                 logger,
                 event="batch_prepare_result",
                 executed_at=run_at,
-                id=record.id,
+                nose_image_id=record.nose_image_id,
+                noseprint_id=record.noseprint_id,
                 object_key=record.object_key,
-                status="failure",
-                **build_error_fields(exc),
+                output_image_path=result.output_image_path,
+                keypoint_count=result.keypoint_count,
+                status="success",
+                error_message="",
+                stack_trace="",
             )
-            continue
-
-        success_count += 1
-        total_keypoint_count += result.keypoint_count
-        print(
-            f"id={record.id} object_key={record.object_key} "
-            f"keypoint_count={result.keypoint_count} status=success"
-        )
-        log_event(
-            logger,
-            event="batch_prepare_result",
-            executed_at=run_at,
-            id=record.id,
-            object_key=record.object_key,
-            output_image_path=result.output_image_path,
-            keypoint_count=result.keypoint_count,
-            status="success",
-            error_message="",
-            stack_trace="",
-        )
+    finally:
+        if connection is not None:
+            connection.close()
 
     log_event(
         logger,
         event="batch_prepare_summary",
         executed_at=run_at,
+        batch_dry_run=config.batch_dry_run,
         total_record_count=len(records),
         success_count=success_count,
         failure_count=failure_count,
         skip_count=skip_count,
+        inserted_count=inserted_count,
         total_keypoint_count=total_keypoint_count,
         status="completed",
         error_message="",
@@ -416,5 +539,6 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
     print(f"SUCCESS_COUNT={success_count}")
     print(f"FAILURE_COUNT={failure_count}")
     print(f"SKIP_COUNT={skip_count}")
+    print(f"INSERTED_COUNT={inserted_count}")
     print(f"TOTAL_KEYPOINT_COUNT={total_keypoint_count}")
     return 0

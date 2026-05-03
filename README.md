@@ -64,25 +64,34 @@ DB からレコード取得だけを行う読み取り専用モード。
 - `DB_FETCH_LIMIT`
 
 ### APP_MODE=batch_prepare_keypoints
-更新前の dry-run 相当として動くバッチモード。
+dry-run と本番更新の両方に対応するバッチモード。
 
 実行内容:
-- DB から `id`, `object_key` を取得する
+- `nose_registrations.noseprint_id` を基点に対象を取得する
+- `nose_images` のうち `is_latest = TRUE` の画像を使う
 - `object_key` を使って `S3_BUCKET` から画像を取得する
 - `DETECTOR_TYPE` に応じて ORB / SIFT で `keypoint_count` を算出する
 - 出力画像を `OUTPUT_IMAGE_PATH` 配下に保存する
-- 標準出力とログへ `id`, `object_key`, `keypoint_count`, `status` を出力する
-- 最後に成功件数、失敗件数、スキップ件数、合計 keypoint 数を出力する
+- 標準出力とログへ `id`, `noseprint_id`, `object_key`, `keypoint_count`, `status` を出力する
+- 最後に成功件数、失敗件数、スキップ件数、登録件数、合計 keypoint 数を出力する
 
 補足:
-- DB 更新は行わない
-- `keypoints_orb` は更新しない
+- `BATCH_DRY_RUN=true` の場合は dry-run として動作し、DB 更新は行わない
+- `BATCH_DRY_RUN=false` の場合は `nose_image_quality` へ登録する
+- `nose_image_quality` には `noseprint_id`, `keypoints_orb`, `app_version` を登録し、`created_at` は default を使う
+- `app_version` は `DB_UPDATE_APP_VERSION` を設定しない場合 `NULL` で登録する
 - 実行件数は `DB_FETCH_LIMIT` で制御する
 - `DB_FETCH_LIMIT` 未指定の場合は全件取得する
+- `nose_image_quality` に既存レコードがある `noseprint_id` は自動的に対象外になる
+- `is_latest = TRUE` が 1件でない `noseprint_id` はスキップしてログへ残す
 
 主な入力:
+- `BATCH_DRY_RUN`
+- `DB_REGISTRATION_TABLE`
 - `DB_SOURCE_TABLE`
+- `DB_UPDATE_TABLE`
 - `DB_FETCH_LIMIT`
+- `DB_UPDATE_APP_VERSION`
 - `S3_BUCKET`
 - `AWS_PROFILE`
 - `DETECTOR_TYPE`
@@ -141,3 +150,27 @@ SIFT の主な設定:
 - `SIFT_CONTRAST_THRESHOLD`
 - `SIFT_EDGE_THRESHOLD`
 - `SIFT_SIGMA`
+
+
+## SQL
+
+- nose_image_quality.idを指定して画像を特定する
+
+```
+\prompt 'nose_image_quality.idを入力してください: ' quality_id
+
+SELECT
+  niq.id AS nose_image_quality_id,
+  niq.noseprint_id,
+  niq.keypoints_orb,
+  niq.app_version,
+  niq.created_at,
+  ni.id AS nose_image_id,
+  ni.object_key,
+  ni.is_latest
+FROM public.nose_image_quality niq
+JOIN public.nose_images ni
+  ON niq.noseprint_id = ni.noseprint_id
+WHERE niq.id = :quality_id
+  AND ni.is_latest = TRUE;
+```

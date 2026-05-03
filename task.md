@@ -110,16 +110,16 @@
 
 ### 8. 更新バッチ処理
 ブランチ名：`feature/08-keypoint-update-batch`
-- まずは更新前バッチとして実装する
-- DB 取得 -> S3 取得 -> ORB 計算 -> 更新対象データ作成の一連の処理をつなぐ
-- DB 更新処理は `keypoints_orb` カラム作成後に追加する
+- dry-run と本番更新の両方に対応する
+- DB 取得 -> S3 取得 -> ORB 計算 -> 更新対象データ作成 -> `nose_image_quality` 更新の一連の処理をつなぐ
 - 1回の実行件数を制御できるようにする
   - `DB_FETCH_LIMIT`
 - 実行対象を再開しやすい形で取得できるようにする
   - 取得順を固定する
   - 既存条件で対象を絞れるようにする
-- 更新前の dry-run 相当として結果を標準出力またはログへ出せるようにする
+- dry-run として結果を標準出力またはログへ出せるようにする
   - `id`
+  - `noseprint_id`
   - `object_key`
   - `keypoint_count`
   - `status`
@@ -129,21 +129,34 @@
 - 本番更新対応時の実装方針を以下とする
   - `APP_MODE` はバッチ用で統一し、dry-run の有無は `BATCH_DRY_RUN=true/false` で切り替える
   - `BATCH_DRY_RUN=true`
-    - DB 更新は行わない
-    - `id`, `object_key`, `keypoint_count`, `status` を標準出力とログへ出力する
+    - `nose_image_quality` への DB 更新は行わない
+    - 本番と同じ取得条件・計算処理を使い、更新直前までを実行する
+    - `id`, `noseprint_id`, `object_key`, `keypoint_count`, `status` を標準出力とログへ出力する
   - `BATCH_DRY_RUN=false`
-    - `keypoints_orb` へ実際に更新する
-  - 取得対象は `keypoints_orb IS NULL` のみとする
-  - 取得順は `ORDER BY id ASC` で固定する
+    - `nose_image_quality.keypoints_orb` へ実際に反映する
+  - 更新対象は `nose_image_quality.keypoints_orb IS NULL` のみとする
+  - `nose_images` 側は `is_latest = TRUE` の画像のみを対象にする
+  - `nose_registrations.noseprint_id` を基点に、`nose_image_quality` は 1 登録 1 レコードで扱う
+  - 取得順は `nose_images.id ASC` で固定する
   - 実行件数は `DB_FETCH_LIMIT` で制御する
-  - 更新 SQL は `WHERE id = %s AND keypoints_orb IS NULL` を含める
+  - 更新先テーブルは `nose_image_quality` とする
+  - `nose_image_quality.noseprint_id` は `nose_registrations(noseprint_id)` への外部キーかつ `UNIQUE` 制約あり前提で扱う
+  - 本番更新は `UPDATE` ではなく `INSERT` で実装する
+  - `INSERT` または再実行時の重複回避ロジックは `noseprint_id` を基準にする
+  - 取得 SQL では `nose_images.noseprint_id` と `nose_image_quality.noseprint_id` を使って未処理対象を判定する
+  - 更新 SQL は未処理判定を含める
     - 途中停止後の再実行時に更新済みデータを自然にスキップできるようにする
+  - `app_version` は `NULL` で登録する
+  - `created_at` は default を使う
   - 更新は 1件ごとに実施し、成功したものから順にコミットする
   - 1件失敗しても全体は継続し、失敗内容はログへ残す
-  - `keypoints_orb` カラムを持つ更新先テーブルは、読み取り元テーブルとは別に指定できるようにする
+  - 更新先テーブルは、読み取り元テーブルとは別に指定できるようにする
     - 更新先テーブル名は環境変数で指定する
-    - 例: `DB_UPDATE_TABLE`
-  - `keypoints_orb` カラムを持つ更新先テーブルが未作成の場合は、本番更新処理を有効化しない
+    - 例: `DB_UPDATE_TABLE=nose_image_quality`
+  - 実装手順は以下とする
+    - まず dry-run を実装・実行する
+    - dry-run の結果に問題がないことを確認する
+    - その後、本番更新処理を有効化する
 
 ### 9. バッチ向けログ出力
 ブランチ名：`feature/09-batch-logging`
@@ -184,6 +197,14 @@
 - 途中失敗時も他レコードの処理は継続する
 - 全件処理時の負荷を考慮し、必要なら件数制限や再開しやすい仕組みを入れる
 - 同じレコードを再実行したときの上書き方針を決める
+
+## 懸念点
+- `nose_images` の `is_latest = TRUE` が常に 1 `noseprint_id` につき 1件であることを確認する必要がある
+- `nose_image_quality` は `INSERT` 前提のため、再実行時に `noseprint_id` 重複を起こさない制御が必要
+- `keypoints_orb IS NULL` 条件で対象を絞る場合、判定対象は `nose_image_quality.keypoints_orb` になる
+- `app_version` を `NULL` で入れてよいかを最終確認する
+- `created_at` は default を使う前提でよいか確認する
+- dry-run と本番で対象件数・取得条件がずれないよう、同じ取得ロジックを使う必要がある
 
 ## 未決事項
 - `keypoints_orb` を更新対象にする条件
