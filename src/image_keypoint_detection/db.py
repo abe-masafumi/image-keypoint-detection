@@ -84,36 +84,18 @@ def fetch_nose_images_for_batch(
     if limit is None:
         query = sql.SQL(
             """
-            WITH latest_image_stats AS (
-                SELECT
-                    noseprint_id,
-                    COUNT(*) FILTER (WHERE is_latest = TRUE) AS latest_image_count,
-                    MIN(id) FILTER (WHERE is_latest = TRUE) AS latest_image_id
-                FROM {}.{}
-                GROUP BY noseprint_id
-            )
             SELECT
-                lis.latest_image_id AS nose_image_id,
-                nr.noseprint_id,
+                ni.id AS nose_image_id,
+                ni.noseprint_id,
                 ni.object_key,
-                COALESCE(lis.latest_image_count, 0) AS latest_image_count
-            FROM {}.{} nr
-            LEFT JOIN latest_image_stats lis
-              ON nr.noseprint_id = lis.noseprint_id
-            LEFT JOIN {}.{} ni
-              ON ni.id = lis.latest_image_id
+                1 AS latest_image_count
+            FROM {}.{} ni
             LEFT JOIN {}.{} niq
-              ON nr.noseprint_id = niq.noseprint_id
-            WHERE niq.noseprint_id IS NULL
-            ORDER BY
-              COALESCE(lis.latest_image_id, 2147483647) ASC,
-              nr.noseprint_id ASC
+                ON ni.id = niq.nose_image_id
+            WHERE niq.nose_image_id IS NULL
+            ORDER BY ni.id ASC
             """
         ).format(
-            sql.Identifier(config.db_schema),
-            sql.Identifier(config.db_source_table),
-            sql.Identifier(config.db_schema),
-            sql.Identifier(config.db_registration_table),
             sql.Identifier(config.db_schema),
             sql.Identifier(config.db_source_table),
             sql.Identifier(config.db_schema),
@@ -122,37 +104,19 @@ def fetch_nose_images_for_batch(
     else:
         query = sql.SQL(
             """
-            WITH latest_image_stats AS (
-                SELECT
-                    noseprint_id,
-                    COUNT(*) FILTER (WHERE is_latest = TRUE) AS latest_image_count,
-                    MIN(id) FILTER (WHERE is_latest = TRUE) AS latest_image_id
-                FROM {}.{}
-                GROUP BY noseprint_id
-            )
             SELECT
-                lis.latest_image_id AS nose_image_id,
-                nr.noseprint_id,
+                ni.id AS nose_image_id,
+                ni.noseprint_id,
                 ni.object_key,
-                COALESCE(lis.latest_image_count, 0) AS latest_image_count
-            FROM {}.{} nr
-            LEFT JOIN latest_image_stats lis
-              ON nr.noseprint_id = lis.noseprint_id
-            LEFT JOIN {}.{} ni
-              ON ni.id = lis.latest_image_id
+                1 AS latest_image_count
+            FROM {}.{} ni
             LEFT JOIN {}.{} niq
-              ON nr.noseprint_id = niq.noseprint_id
-            WHERE niq.noseprint_id IS NULL
-            ORDER BY
-              COALESCE(lis.latest_image_id, 2147483647) ASC,
-              nr.noseprint_id ASC
+                ON ni.id = niq.nose_image_id
+            WHERE niq.nose_image_id IS NULL
+            ORDER BY ni.id ASC
             LIMIT %s
             """
         ).format(
-            sql.Identifier(config.db_schema),
-            sql.Identifier(config.db_source_table),
-            sql.Identifier(config.db_schema),
-            sql.Identifier(config.db_registration_table),
             sql.Identifier(config.db_schema),
             sql.Identifier(config.db_source_table),
             sql.Identifier(config.db_schema),
@@ -182,15 +146,15 @@ def insert_nose_image_quality(
     connection: PgConnection,
     config: AppConfig,
     *,
-    noseprint_id: int,
+    nose_image_id: int,
     keypoints_orb: int,
     app_version: str | None,
 ) -> bool:
     query = sql.SQL(
         """
-        INSERT INTO {}.{} (noseprint_id, keypoints_orb, app_version)
+        INSERT INTO {}.{} (nose_image_id, keypoints_orb, app_version)
         VALUES (%s, %s, %s)
-        ON CONFLICT (noseprint_id) DO NOTHING
+        ON CONFLICT (nose_image_id) DO NOTHING
         """
     ).format(
         sql.Identifier(config.db_schema),
@@ -201,7 +165,7 @@ def insert_nose_image_quality(
         cursor.execute(
             query,
             (
-                noseprint_id,
+                nose_image_id,
                 keypoints_orb,
                 app_version,
             ),

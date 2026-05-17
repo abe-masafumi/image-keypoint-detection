@@ -257,7 +257,7 @@ def run_db_fetch_latest(config: AppConfig, logger, run_at: str) -> int:
         return 1
 
     for record in records:
-        print(f"id={record.id} object_key={record.object_key}")
+        print(f"nose_image_id={record.id} object_key={record.object_key}")
         log_event(
             logger,
             event="db_fetch_record",
@@ -479,7 +479,7 @@ def run_batch_prepare_keypoints(
             except Exception as exc:
                 failure_count += 1
                 print(
-                    f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                    f"nose_image_id={record.nose_image_id} noseprint_id={record.noseprint_id} "
                     f"object_key={record.object_key} status=failure error={exc}"
                 )
                 log_event(
@@ -550,7 +550,7 @@ def run_batch_prepare_keypoints(
                 else:
                     skip_count += 1
                     print(
-                        f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                        f"nose_image_id={record.nose_image_id} noseprint_id={record.noseprint_id} "
                         f"object_key={record.object_key} keypoint_count={result.keypoint_count} "
                         "status=skipped reason=\"nose_image_quality already exists\""
                     )
@@ -585,7 +585,7 @@ def run_batch_prepare_keypoints(
             success_count += 1
             total_keypoint_count += result.keypoint_count
             print(
-                f"id={record.nose_image_id} noseprint_id={record.noseprint_id} "
+                f"nose_image_id={record.nose_image_id} noseprint_id={record.noseprint_id} "
                 f"object_key={record.object_key} keypoint_count={result.keypoint_count} "
                 f"status=success"
             )
