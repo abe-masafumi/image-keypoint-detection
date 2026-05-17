@@ -509,7 +509,7 @@ def run_batch_prepare_keypoints(
                     inserted = insert_nose_image_quality(
                         connection,
                         config,
-                        noseprint_id=record.noseprint_id,
+                        nose_image_id=record.nose_image_id,
                         keypoints_orb=result.keypoint_count,
                         app_version=config.db_update_app_version,
                     )
