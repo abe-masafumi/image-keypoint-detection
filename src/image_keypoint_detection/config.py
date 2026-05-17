@@ -12,6 +12,7 @@ class AppConfig:
     app_mode: str
     batch_dry_run: bool
     log_path: str
+    batch_error_log_path: str
     image_path: str
     output_image_path: str
     detector_type: str
@@ -57,6 +58,10 @@ class AppConfig:
             app_mode=os.getenv("APP_MODE", "image_keypoint"),
             batch_dry_run=_get_bool("BATCH_DRY_RUN", default=True),
             log_path=os.getenv("LOG_PATH", "logs/app.log"),
+            batch_error_log_path=os.getenv(
+                "BATCH_ERROR_LOG_PATH",
+                "logs/batch_errors.log",
+            ),
             image_path=os.getenv("IMAGE_PATH", ""),
             output_image_path=os.getenv(
                 "OUTPUT_IMAGE_PATH",

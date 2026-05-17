@@ -8,9 +8,18 @@ from pathlib import Path
 from typing import Any
 
 
-def setup_logger(log_path: str) -> logging.Logger:
-    resolved_log_path = resolve_log_file_path(log_path)
-    logger = logging.getLogger("image_keypoint_detection")
+def setup_logger(
+    log_path: str,
+    *,
+    logger_name: str = "image_keypoint_detection",
+    daily_rotate: bool = True,
+) -> logging.Logger:
+    resolved_log_path = (
+        resolve_log_file_path(log_path)
+        if daily_rotate
+        else Path(log_path)
+    )
+    logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
     logger.propagate = False
 

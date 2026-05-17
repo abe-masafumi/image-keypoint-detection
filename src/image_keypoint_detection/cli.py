@@ -33,12 +33,22 @@ from image_keypoint_detection.sift import (
 def main() -> int:
     config = AppConfig.from_env()
     logger = setup_logger(config.log_path)
+    batch_error_logger = setup_logger(
+        config.batch_error_log_path,
+        logger_name="image_keypoint_detection_batch_errors",
+        daily_rotate=False,
+    )
     run_at = datetime.now(timezone.utc).isoformat()
 
     if config.app_mode == "db_fetch_latest":
         return run_db_fetch_latest(config, logger, run_at)
     if config.app_mode == "batch_prepare_keypoints":
-        return run_batch_prepare_keypoints(config, logger, run_at)
+        return run_batch_prepare_keypoints(
+            config,
+            logger,
+            batch_error_logger,
+            run_at,
+        )
 
     if not config.image_path:
         print("IMAGE_PATH is not set")
@@ -273,7 +283,12 @@ def run_db_fetch_latest(config: AppConfig, logger, run_at: str) -> int:
     return 0
 
 
-def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
+def run_batch_prepare_keypoints(
+    config: AppConfig,
+    logger,
+    batch_error_logger,
+    run_at: str,
+) -> int:
     print("batch prepare keypoints")
     print(f"BATCH_DRY_RUN={config.batch_dry_run}")
     print(f"DB_REGISTRATION_TABLE={config.db_schema}.{config.db_registration_table}")
@@ -319,6 +334,18 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
             status="failure",
             **build_error_fields(exc),
         )
+        _log_batch_issue(
+            batch_error_logger,
+            event="batch_prepare_failure",
+            executed_at=run_at,
+            batch_dry_run=config.batch_dry_run,
+            db_registration_table=config.db_registration_table,
+            db_schema=config.db_schema,
+            db_source_table=config.db_source_table,
+            db_update_table=config.db_update_table,
+            status="failure",
+            **build_error_fields(exc),
+        )
         return 1
 
     success_count = 0
@@ -335,6 +362,18 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
             print(f"Batch update connection failed: {exc}")
             log_event(
                 logger,
+                event="batch_prepare_failure",
+                executed_at=run_at,
+                batch_dry_run=config.batch_dry_run,
+                db_registration_table=config.db_registration_table,
+                db_schema=config.db_schema,
+                db_source_table=config.db_source_table,
+                db_update_table=config.db_update_table,
+                status="failure",
+                **build_error_fields(exc),
+            )
+            _log_batch_issue(
+                batch_error_logger,
                 event="batch_prepare_failure",
                 executed_at=run_at,
                 batch_dry_run=config.batch_dry_run,
@@ -365,6 +404,18 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
                 )
                 log_event(
                     logger,
+                    event="batch_prepare_result",
+                    executed_at=run_at,
+                    nose_image_id=record.nose_image_id,
+                    noseprint_id=record.noseprint_id,
+                    object_key=record.object_key or "",
+                    latest_image_count=record.latest_image_count,
+                    status="skipped",
+                    error_message=error_message,
+                    stack_trace="",
+                )
+                _log_batch_issue(
+                    batch_error_logger,
                     event="batch_prepare_result",
                     executed_at=run_at,
                     nose_image_id=record.nose_image_id,
@@ -441,6 +492,16 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
                     status="failure",
                     **build_error_fields(exc),
                 )
+                _log_batch_issue(
+                    batch_error_logger,
+                    event="batch_prepare_result",
+                    executed_at=run_at,
+                    nose_image_id=record.nose_image_id,
+                    noseprint_id=record.noseprint_id,
+                    object_key=record.object_key,
+                    status="failure",
+                    **build_error_fields(exc),
+                )
                 continue
 
             if not config.batch_dry_run:
@@ -471,6 +532,17 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
                         status="failure",
                         **build_error_fields(exc),
                     )
+                    _log_batch_issue(
+                        batch_error_logger,
+                        event="batch_prepare_result",
+                        executed_at=run_at,
+                        nose_image_id=record.nose_image_id,
+                        noseprint_id=record.noseprint_id,
+                        object_key=record.object_key,
+                        keypoint_count=result.keypoint_count,
+                        status="failure",
+                        **build_error_fields(exc),
+                    )
                     continue
 
                 if inserted:
@@ -484,6 +556,19 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
                     )
                     log_event(
                         logger,
+                        event="batch_prepare_result",
+                        executed_at=run_at,
+                        nose_image_id=record.nose_image_id,
+                        noseprint_id=record.noseprint_id,
+                        object_key=record.object_key,
+                        output_image_path=result.output_image_path,
+                        keypoint_count=result.keypoint_count,
+                        status="skipped",
+                        error_message="nose_image_quality already exists",
+                        stack_trace="",
+                    )
+                    _log_batch_issue(
+                        batch_error_logger,
                         event="batch_prepare_result",
                         executed_at=run_at,
                         nose_image_id=record.nose_image_id,
@@ -542,3 +627,7 @@ def run_batch_prepare_keypoints(config: AppConfig, logger, run_at: str) -> int:
     print(f"INSERTED_COUNT={inserted_count}")
     print(f"TOTAL_KEYPOINT_COUNT={total_keypoint_count}")
     return 0
+
+
+def _log_batch_issue(logger, **fields) -> None:
+    log_event(logger, **fields)
